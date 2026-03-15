@@ -385,6 +385,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
               <span style="font-size:1.5rem">📷</span>
               <span style="font-size:0.78rem;color:var(--text-dim)">Tap to photograph meter</span>
             </div>
+            <div style="margin-top:6px;text-align:center">
+              <button class="btn btn-sm" onclick="pickFromGallery()" style="font-size:0.74rem">🖼 Choose from Gallery</button>
+              <input type="file" id="gallery-input" accept="image/*" style="display:none" onchange="handleGalleryPick(this)">
+            </div>
           </div>
           <div id="ai-read-btn" style="display:none;background:var(--accent-dim);border:1px solid #bae6fd;border-radius:8px;padding:8px 12px;margin-bottom:0.85rem;align-items:center;justify-content:center;gap:8px;cursor:pointer" onclick="readMeterPhoto()">
             <span style="font-size:1rem">🤖</span>
@@ -790,6 +794,26 @@ function setPhoto(data){
 }
 function clearPhoto(){photo=null;const a=document.getElementById('photo-area');a.classList.remove('has-photo');a.innerHTML='<span style="font-size:1.5rem">📷</span><span style="font-size:0.78rem;color:var(--text-dim)">Tap to photograph meter</span>';const aiBtn=document.getElementById('ai-read-btn');if(aiBtn)aiBtn.style.display='none';}
 function closeCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}document.getElementById('cam-modal').style.display='none';}
+function pickFromGallery(){document.getElementById('gallery-input').click();}
+function handleGalleryPick(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    // Compress like camera does
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');
+      const max=1920;
+      let w=img.width,h=img.height;
+      if(w>max||h>max){const s=Math.min(max/w,max/h);w=Math.round(w*s);h=Math.round(h*s);}
+      c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+      setPhoto(c.toDataURL('image/jpeg',0.82));
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(f);
+  input.value='';
+}
 /* VALIDATION */
 function validateRead(){
   const p=parseFloat(document.getElementById('f-prev-read').value);

@@ -626,11 +626,14 @@ async function renderSidebar(){
       const latest=mrs[0]; // already sorted newest first
       const days=Math.floor((Date.now()-latest.ts)/86400000);
       const dotC=days<=30?'ok':days<=60?'warn':'';
-      const badge=days<=30?`<span class="m-badge b-ok">Recent</span>`:days<=90?`<span class="m-badge b-warn">${days}d</span>`:`<span class="m-badge b-old">${days}d</span>`;
+      const badge=isRoute?`<span class="m-badge bp">Route</span>`:days<=30?`<span class="m-badge b-ok">Recent</span>`:days<=90?`<span class="m-badge b-warn">${days}d</span>`:`<span class="m-badge b-old">${days}d</span>`;
       const isSel=selMeter===mk;
-      const lastReadStr=latest.currRead.toLocaleString()+' '+(TU[latest.type]||'');
-      const lastDateStr=new Date(latest.ts).toLocaleDateString();
-      html+=`<div class="meter-row${isSel?' sel':''}" onclick="pickMeter('${esc(addr)}','','${esc(mk)}','${esc(latest.account||'')}','${esc(latest.meter||'')}','${esc(latest.type||'water')}','${esc(latest.currRead)}')">
+      const isRoute=latest.currRead===0&&latest.prevRead!=null&&latest.status==='pending';
+      const displayRead=isRoute?latest.prevRead:latest.currRead;
+      const lastReadStr=(displayRead!=null?displayRead.toLocaleString():'—')+' '+(TU[latest.type]||'');
+      const lastDateStr=isRoute?'Needs reading':new Date(latest.ts).toLocaleDateString();
+      const prevForForm=isRoute?latest.prevRead:latest.currRead;
+      html+=`<div class="meter-row${isSel?' sel':''}" onclick="pickMeter('${esc(addr)}','','${esc(mk)}','${esc(latest.account||'')}','${esc(latest.meter||'')}','${esc(latest.type||'water')}','${esc(prevForForm)}')">
   <div class="m-dot ${dotC}"></div>
   <div class="m-info">
     <div class="m-id">${latest.meter||latest.account||'Meter'}</div>
@@ -1366,8 +1369,13 @@ async function createRoute(){
     created++;
   }
   routeSelected.clear();
+  // Auto-expand all addresses in sidebar so route entries are visible
+  const addrs=new Set(selected.map(b=>b.address||'(No address)'));
+  addrs.forEach(a=>openAddrs.add(a));
   toast(created+' building'+(created!==1?'s':'')+' added to route!','success');
-  updateTabCount();renderSidebar();
+  updateTabCount();await renderSidebar();
+  // Open sidebar on desktop
+  if(window.innerWidth>700){sbOpen=true;document.getElementById('sidebar').classList.remove('collapsed');}
   switchTab('new-read');
 }
 </script>

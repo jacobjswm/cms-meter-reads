@@ -1,4 +1,4 @@
-const CACHE='cms-meter-v7';
+const CACHE='cms-meter-v8';
 const ASSETS=[
   './',
   'index.html',
@@ -13,9 +13,9 @@ self.addEventListener('activate',e=>{
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
   e.respondWith(
-    caches.match(e.request).then(r=>r||fetch(e.request).then(resp=>{
+    fetch(e.request).then(resp=>{
       if(resp.status===200){const c=resp.clone();caches.open(CACHE).then(cache=>cache.put(e.request,c));}
       return resp;
-    }).catch(()=>caches.match('index.html')))
+    }).catch(()=>caches.match(e.request).then(r=>r||caches.match('index.html')))
   );
 });

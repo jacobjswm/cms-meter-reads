@@ -380,13 +380,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             </div>
           </div>
           <div class="fs">
-            <div class="fs-title">Photo</div>
-            <div class="photo-area" id="photo-area" onclick="openCamera()">
-              <span style="font-size:1.5rem">📷</span>
-              <span style="font-size:0.78rem;color:var(--text-dim)">Tap to photograph meter</span>
-            </div>
-            <div style="margin-top:6px;text-align:center">
-              <button class="btn btn-sm" onclick="pickFromGallery()" style="font-size:0.74rem">🖼 Choose from Gallery</button>
+            <div class="fs-title">Photos <span id="photo-count" style="font-weight:400;color:var(--text-dim);font-size:0.68rem"></span></div>
+            <div id="photo-strip" style="display:none;display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn btn-sm" onclick="openCamera()" style="flex:1">📷 Camera</button>
+              <button class="btn btn-sm" onclick="pickFromGallery()" style="flex:1">🖼 Gallery</button>
               <input type="file" id="gallery-input" accept="image/*" style="display:none" onchange="handleGalleryPick(this)">
             </div>
           </div>
@@ -531,7 +529,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="modal" onclick="event.stopPropagation()">
     <div class="mhd"><span class="mhdt" id="det-title">Read Details</span><button class="mx" onclick="closeDetail()">✕</button></div>
     <div class="mbd">
-      <img id="det-photo" class="mp" src="" alt="" style="display:none">
+      <div id="det-photos" style="display:none;display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
       <div class="dg">
         <div class="di"><label>Account</label><div class="dv" id="det-account">—</div></div>
         <div class="di"><label>Meter</label><div class="dv" id="det-meter">—</div></div>
@@ -573,7 +571,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <div class="toast" id="toast"></div>
 <script>
 const DB='cms_reads3',DV=1,ST='reads';
-let db,photo=null,stream=null,facing='environment',settings={},selMeter=null,gpsPos=null;
+let db,photos=[],stream=null,facing='environment',settings={},selMeter=null,gpsPos=null;
 function initDB(){
   return new Promise((res,rej)=>{
     const q=indexedDB.open(DB,DV);
@@ -785,14 +783,25 @@ function snapPhoto(){
   setPhoto(c.toDataURL('image/jpeg',0.82));closeCamera();
 }
 function setPhoto(data){
-  photo=data;
-  const a=document.getElementById('photo-area');a.classList.add('has-photo');
-  a.innerHTML=`<img src="${data}" alt=""><div class="pov"><button class="btn btn-sm" onclick="event.stopPropagation();openCamera()">Retake</button><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();clearPhoto()">Remove</button></div>`;
-  // Show AI read button if Claude key configured
+  photos.push(data);
+  renderPhotoStrip();
+}
+function removePhoto(idx){photos.splice(idx,1);renderPhotoStrip();}
+function clearPhotos(){photos=[];renderPhotoStrip();}
+function renderPhotoStrip(){
+  const strip=document.getElementById('photo-strip');
+  const cnt=document.getElementById('photo-count');
+  cnt.textContent=photos.length?'('+photos.length+')':'';
+  if(!photos.length){strip.style.display='none';strip.innerHTML='';
+    const aiBtn=document.getElementById('ai-read-btn');if(aiBtn)aiBtn.style.display='none';return;}
+  strip.style.display='flex';
+  strip.innerHTML=photos.map((p,i)=>`<div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border);flex-shrink:0">
+    <img src="${p}" style="width:100%;height:100%;object-fit:cover">
+    <div onclick="removePhoto(${i})" style="position:absolute;top:2px;right:2px;width:20px;height:20px;background:rgba(0,0,0,0.6);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;cursor:pointer;line-height:1">✕</div>
+  </div>`).join('');
   const aiBtn=document.getElementById('ai-read-btn');
   if(aiBtn){aiBtn.style.display=settings.claudeKey?'flex':'none';}
 }
-function clearPhoto(){photo=null;const a=document.getElementById('photo-area');a.classList.remove('has-photo');a.innerHTML='<span style="font-size:1.5rem">📷</span><span style="font-size:0.78rem;color:var(--text-dim)">Tap to photograph meter</span>';const aiBtn=document.getElementById('ai-read-btn');if(aiBtn)aiBtn.style.display='none';}
 function closeCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}document.getElementById('cam-modal').style.display='none';}
 function pickFromGallery(){document.getElementById('gallery-input').click();}
 function handleGalleryPick(input){
@@ -866,7 +875,7 @@ document.getElementById('btn-save').addEventListener('click',async()=>{
     address,meter:document.getElementById('f-meter').value.trim(),
     unit:document.getElementById('f-unit').value.trim(),type:document.getElementById('f-type').value,
     prevRead:isNaN(prev)?null:prev,currRead:cv,consumption:isNaN(prev)?null:cv-prev,
-    notes:document.getElementById('f-notes').value.trim(),meterNotes:document.getElementById('f-meter-notes').value.trim(),photo,tech:settings.tech||'',status:'pending',driveUrl:null,
+    notes:document.getElementById('f-notes').value.trim(),meterNotes:document.getElementById('f-meter-notes').value.trim(),photo:photos[0]||null,photos:[...photos],tech:settings.tech||'',status:'pending',driveUrl:null,
     contactName:document.getElementById('f-contact-name').value.trim(),
     contactPhone:document.getElementById('f-contact-phone').value.trim(),
     contactEmail:document.getElementById('f-contact-email').value.trim(),
@@ -878,7 +887,7 @@ document.getElementById('btn-save').addEventListener('click',async()=>{
     account,address,meter:document.getElementById('f-meter').value.trim(),
     unit:document.getElementById('f-unit').value.trim(),type:document.getElementById('f-type').value,
     prevRead:isNaN(prev)?null:prev,currRead:cv,consumption:isNaN(prev)?null:cv-prev,
-    notes:document.getElementById('f-notes').value.trim(),meterNotes:document.getElementById('f-meter-notes').value.trim(),photo,tech:settings.tech||'',status:'pending',driveUrl:null,
+    notes:document.getElementById('f-notes').value.trim(),meterNotes:document.getElementById('f-meter-notes').value.trim(),photo:photos[0]||null,photos:[...photos],tech:settings.tech||'',status:'pending',driveUrl:null,
     contactName:document.getElementById('f-contact-name').value.trim(),
     contactPhone:document.getElementById('f-contact-phone').value.trim(),
     contactEmail:document.getElementById('f-contact-email').value.trim(),
@@ -893,7 +902,7 @@ document.getElementById('btn-save').addEventListener('click',async()=>{
 function clearForm(){
   ['f-account','f-meter','f-address','f-unit','f-notes','f-meter-notes','f-prev-read','f-curr-read','f-contact-name','f-contact-phone','f-contact-email','f-access-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-type').value='water';
-  clearPhoto();updateCons();
+  clearPhotos();updateCons();
   document.getElementById('pf-banner').style.display='none';
   document.getElementById('val-warn').style.display='none';
   selMeter=null;
@@ -973,8 +982,12 @@ async function openDetail(id){
     if(rec.accessNotes)parts.push('Access: '+rec.accessNotes);
     document.getElementById('det-contact-txt').textContent=parts.join(' | ');
   }else ci.style.display='none';
-  const ph=document.getElementById('det-photo');
-  if(rec.photo){ph.src=rec.photo;ph.style.display='block';}else ph.style.display='none';
+  const phDiv=document.getElementById('det-photos');
+  const allPhotos=rec.photos||( rec.photo?[rec.photo]:[]);
+  if(allPhotos.length){
+    phDiv.style.display='flex';
+    phDiv.innerHTML=allPhotos.map(p=>`<img src="${p}" style="width:${allPhotos.length===1?'100%':'48%'};border-radius:8px;object-fit:cover;max-height:220px;cursor:pointer" onclick="window.open(this.src)">`).join('');
+  }else{phDiv.style.display='none';phDiv.innerHTML='';}
   const nw=document.getElementById('det-nw');
   if(rec.notes){nw.style.display='block';document.getElementById('det-ntxt').textContent=rec.notes;}else nw.style.display='none';
   const mnw=document.getElementById('det-mnw');
@@ -995,7 +1008,8 @@ async function openDetail(id){
     document.getElementById('f-contact-phone').value=rec.contactPhone||'';
     document.getElementById('f-contact-email').value=rec.contactEmail||'';
     document.getElementById('f-access-notes').value=rec.accessNotes||'';
-    if(rec.photo){setPhoto(rec.photo);}else{clearPhoto();}
+    const editPhotos=rec.photos||(rec.photo?[rec.photo]:[]);
+    clearPhotos();editPhotos.forEach(p=>setPhoto(p));
     updateCons();
     // Delete old record so save creates fresh one (or updates route match)
     del(id).then(()=>{updateTabCount();renderRecords();renderSidebar();});
@@ -1034,7 +1048,11 @@ async function syncOne(rec){
 async function pushOne(rec){
   try{
     let du=rec.driveUrl;
-    if(rec.photo&&!du&&settings.folderId)du=await uploadDrive(rec);
+    const recPhotos=rec.photos||(rec.photo?[rec.photo]:[]);
+    if(recPhotos.length&&!du&&settings.folderId){
+      const urls=[];for(const p of recPhotos){const u=await uploadDrivePhoto(p,rec);if(u)urls.push(u);}
+      du=urls.join(' , ');
+    }
     const d=new Date(rec.ts);
     const row=[d.toLocaleDateString(),d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),rec.account,rec.address,rec.unit,rec.meter,rec.type,rec.prevRead??'',rec.currRead,rec.consumption??'',rec.tech,rec.notes,du||'',rec.contactName??'',rec.contactPhone??'',rec.contactEmail??'',rec.accessNotes??'',rec.gpsLat??'',rec.gpsLng??'',rec.flagged?'Y':'',rec.id];
     const chk=await sReq('GET',`/${settings.sheetId}/values/A1`);
@@ -1047,8 +1065,8 @@ async function pushOne(rec){
   }catch(e){toast('Sync failed: '+e.message,'error');return false;}
 }
 function sReq(m,p,b){return fetch('https://sheets.googleapis.com/v4/spreadsheets'+p,{method:m,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}).then(r=>r.json());}
-async function uploadDrive(rec){
-  const blob=await fetch(rec.photo).then(r=>r.blob());
+async function uploadDrivePhoto(photoData,rec){
+  const blob=await fetch(photoData).then(r=>r.blob());
   const meta=JSON.stringify({name:`meter_${rec.account||rec.id}_${Date.now()}.jpg`,parents:settings.folderId?[settings.folderId]:[]});
   const form=new FormData();form.append('metadata',new Blob([meta],{type:'application/json'}));form.append('file',blob);
   const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=webViewLink',{method:'POST',headers:{'Authorization':'Bearer '+token},body:form}).then(r=>r.json());
@@ -1115,7 +1133,7 @@ async function importCSV(input){
     const rec={
       id:Date.now()+'-'+Math.random().toString(36).slice(2,7)+'-'+i,
       ts:Date.now(),account:'',address:'',meter:'',unit:'',type:'water',
-      prevRead:null,currRead:0,consumption:null,notes:'',photo:null,
+      prevRead:null,currRead:0,consumption:null,notes:'',photo:null,photos:[],
       tech:settings.tech||'',status:'pending',driveUrl:null,
       contactName:'',contactPhone:'',contactEmail:'',accessNotes:'',
       gpsLat:null,gpsLng:null,flagged:false,
@@ -1193,13 +1211,14 @@ function updateClaudeStatus(){
   else{dot.className='gdot';txt.textContent='Not configured';}
 }
 async function readMeterPhoto(){
-  if(!photo){toast('Take a photo first','error');return;}
+  if(!photos.length){toast('Take a photo first','error');return;}
   if(!settings.claudeKey){toast('Add Claude API key in Settings','error');return;}
   const btn=document.getElementById('ai-read-text');
   btn.textContent='Reading meter…';
   try{
     // Extract base64 and media type from data URL
-    const match=photo.match(/^data:(image\/\w+);base64,(.+)$/);
+    const lastPhoto=photos[photos.length-1];
+    const match=lastPhoto.match(/^data:(image\/\w+);base64,(.+)$/);
     if(!match){toast('Invalid photo format','error');btn.textContent='Read Meter with AI';return;}
     const mediaType=match[1], base64Data=match[2];
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
@@ -1556,7 +1575,7 @@ async function createRoute(){
       currRead:0,
       consumption:null,
       notes:'',
-      photo:null,
+      photo:null,photos:[],
       tech:settings.tech||'',
       status:'route',
       driveUrl:null,
@@ -1634,7 +1653,7 @@ async function pullRouteFromSheets(){
         ts:Date.now(),account:account||'',address:address||'',
         meter:meter||'',unit:'',type:'water',
         prevRead:prevReadStr?parseFloat(String(prevReadStr).replace(/,/g,'')):null,
-        currRead:0,consumption:null,notes:'',meterNotes:'',photo:null,
+        currRead:0,consumption:null,notes:'',meterNotes:'',photo:null,photos:[],
         tech:settings.tech||'',status:'route',driveUrl:null,
         contactName:contactName||'',contactPhone:'',contactEmail:'',
         accessNotes:accessNotes||'',

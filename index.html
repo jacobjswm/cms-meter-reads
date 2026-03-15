@@ -628,7 +628,7 @@ async function renderSidebar(){
       const dotC=days<=30?'ok':days<=60?'warn':'';
       const badge=isRoute?`<span class="m-badge bp">Route</span>`:days<=30?`<span class="m-badge b-ok">Recent</span>`:days<=90?`<span class="m-badge b-warn">${days}d</span>`:`<span class="m-badge b-old">${days}d</span>`;
       const isSel=selMeter===mk;
-      const isRoute=latest.currRead===0&&latest.prevRead!=null&&latest.status==='pending';
+      const isRoute=latest.status==='route';
       const displayRead=isRoute?latest.prevRead:latest.currRead;
       const lastReadStr=(displayRead!=null?displayRead.toLocaleString():'—')+' '+(TU[latest.type]||'');
       const lastDateStr=isRoute?'Needs reading':new Date(latest.ts).toLocaleDateString();
@@ -776,7 +776,22 @@ document.getElementById('btn-save').addEventListener('click',async()=>{
   const hasErr=flags.some(f=>f.level==='err');
   if(hasErr&&!confirm('Reading has errors. Save anyway?'))return;
   if(flags.length&&!hasErr&&!confirm('Reading has warnings. Save anyway?'))return;
-  const rec={
+  // Check if this is updating a route entry
+  const allRecs=await getAll();
+  const routeMatch=allRecs.find(r=>r.status==='route'&&r.account===account&&(r.meter===document.getElementById('f-meter').value.trim()||!r.meter));
+  const rec=routeMatch?Object.assign(routeMatch,{
+    ts:Date.now(),
+    address,meter:document.getElementById('f-meter').value.trim(),
+    unit:document.getElementById('f-unit').value.trim(),type:document.getElementById('f-type').value,
+    prevRead:isNaN(prev)?null:prev,currRead:cv,consumption:isNaN(prev)?null:cv-prev,
+    notes:document.getElementById('f-notes').value.trim(),photo,tech:settings.tech||'',status:'pending',driveUrl:null,
+    contactName:document.getElementById('f-contact-name').value.trim(),
+    contactPhone:document.getElementById('f-contact-phone').value.trim(),
+    contactEmail:document.getElementById('f-contact-email').value.trim(),
+    accessNotes:document.getElementById('f-access-notes').value.trim(),
+    gpsLat:gpsPos?gpsPos.lat:null,gpsLng:gpsPos?gpsPos.lng:null,
+    flagged:flags.length>0,
+  }):{
     id:Date.now()+'-'+Math.random().toString(36).slice(2,7),ts:Date.now(),
     account,address,meter:document.getElementById('f-meter').value.trim(),
     unit:document.getElementById('f-unit').value.trim(),type:document.getElementById('f-type').value,
@@ -808,6 +823,7 @@ async function renderRecords(){
   const q=document.getElementById('rec-search').value.toLowerCase();
   const st=document.getElementById('rec-filter').value;
   const f=all.filter(r=>{
+    if(r.status==='route')return false; // route entries not yet read
     const txt=[r.account,r.address,r.meter,r.unit,r.notes].join(' ').toLowerCase();
     if(q&&!txt.includes(q))return false;
     if(st==='flagged')return r.flagged;
@@ -1064,16 +1080,18 @@ function updateGS(){
 }
 async function renderStats(all){
   if(!all)all=await getAll();
-  document.getElementById('st-total').textContent=all.length;
-  document.getElementById('st-pend').textContent=all.filter(r=>r.status==='pending').length;
-  document.getElementById('st-sync').textContent=all.filter(r=>r.status==='synced').length;
+  const reads=all.filter(r=>r.status!=='route');
+  const routes=all.filter(r=>r.status==='route');
+  document.getElementById('st-total').textContent=reads.length+(routes.length?` (+${routes.length} route)`:'');
+  document.getElementById('st-pend').textContent=reads.filter(r=>r.status==='pending').length;
+  document.getElementById('st-sync').textContent=reads.filter(r=>r.status==='synced').length;
 }
 async function clearAllData(){
   if(!confirm('Delete ALL records?'))return;
   const all=await getAll();for(const r of all)await del(r.id);
   toast('Cleared');renderRecords();updateTabCount();renderSidebar();
 }
-async function updateTabCount(){const all=await getAll();document.getElementById('tab-count').textContent=all.length;}
+async function updateTabCount(){const all=await getAll();document.getElementById('tab-count').textContent=all.filter(r=>r.status!=='route').length;}
 let tt;
 function toast(msg,type=''){
   const t=document.getElementById('toast');
@@ -1356,7 +1374,7 @@ async function createRoute(){
       notes:'',
       photo:null,
       tech:settings.tech||'',
-      status:'pending',
+      status:'route',
       driveUrl:null,
       contactName:b.owner||b.companyName||'',
       contactPhone:'',

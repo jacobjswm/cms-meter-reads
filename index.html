@@ -521,6 +521,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div class="dn" id="det-nw" style="display:none"><label>Notes</label><p id="det-ntxt"></p></div>
       <div class="mft">
         <button class="btn btn-danger btn-sm" id="det-del">Delete</button>
+        <button class="btn btn-sm" id="det-edit" style="margin-left:6px">✏ Edit</button>
         <div style="flex:1"></div>
         <button class="btn btn-sm btn-accent" id="det-sync">↑ Sync</button>
       </div>
@@ -915,6 +916,30 @@ async function openDetail(id){
   const nw=document.getElementById('det-nw');
   if(rec.notes){nw.style.display='block';document.getElementById('det-ntxt').textContent=rec.notes;}else nw.style.display='none';
   document.getElementById('det-del').onclick=async()=>{if(!confirm('Delete?'))return;await del(id);closeDetail();renderRecords();updateTabCount();renderSidebar();toast('Deleted');};
+  document.getElementById('det-edit').onclick=()=>{
+    // Load record into form for editing
+    document.getElementById('f-account').value=rec.account||'';
+    document.getElementById('f-meter').value=rec.meter||'';
+    document.getElementById('f-address').value=rec.address||'';
+    document.getElementById('f-unit').value=rec.unit||'';
+    document.getElementById('f-type').value=rec.type||'water';
+    document.getElementById('f-prev-read').value=rec.prevRead!=null?rec.prevRead:'';
+    document.getElementById('f-curr-read').value=rec.currRead||'';
+    document.getElementById('f-notes').value=rec.notes||'';
+    document.getElementById('f-contact-name').value=rec.contactName||'';
+    document.getElementById('f-contact-phone').value=rec.contactPhone||'';
+    document.getElementById('f-contact-email').value=rec.contactEmail||'';
+    document.getElementById('f-access-notes').value=rec.accessNotes||'';
+    if(rec.photo){setPhoto(rec.photo);}else{clearPhoto();}
+    updateCons();
+    // Delete old record so save creates fresh one (or updates route match)
+    del(id).then(()=>{updateTabCount();renderRecords();renderSidebar();});
+    document.getElementById('pf-text').textContent='Editing: '+rec.address;
+    document.getElementById('pf-banner').style.display='flex';
+    closeDetail();
+    switchTab('new-read');
+    document.getElementById('f-curr-read').focus();
+  };
   document.getElementById('det-sync').onclick=()=>syncOne(rec);
   document.getElementById('detail-modal').style.display='flex';
 }

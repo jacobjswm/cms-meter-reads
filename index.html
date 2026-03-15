@@ -376,6 +376,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
               <span style="font-size:0.78rem;color:var(--text-dim)">Tap to photograph meter</span>
             </div>
           </div>
+          <div id="ai-read-btn" style="display:none;background:var(--accent-dim);border:1px solid #bae6fd;border-radius:8px;padding:8px 12px;margin-bottom:0.85rem;align-items:center;justify-content:center;gap:8px;cursor:pointer" onclick="readMeterPhoto()">
+            <span style="font-size:1rem">🤖</span>
+            <span style="font-size:0.82rem;font-weight:500;color:var(--accent-text)" id="ai-read-text">Read Meter with AI</span>
+          </div>
           <div class="fs">
             <div class="fs-title">Notes</div>
             <div class="fld"><textarea id="f-notes" placeholder="Access issues, meter condition, anomalies…"></textarea></div>
@@ -485,6 +489,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
               <div class="set-r"><input type="text" id="set-folder-id" placeholder="Optional"></div>
             </div>
             <div class="gsr"><div class="gdot" id="gdot"></div><span id="gstatus-txt">Not configured</span></div>
+          </div>
+          <div class="ss">
+            <div class="st">AI Meter Reading</div>
+            <div class="sd">Auto-read meter digits from photos using Claude Vision AI.</div>
+            <div class="fld" style="margin-bottom:8px">
+              <label style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;display:block">Claude API Key</label>
+              <div class="set-r"><input type="password" id="set-claude-key" placeholder="sk-ant-..."><button class="btn btn-sm" onclick="saveSettings()">Save</button></div>
+            </div>
+            <div class="gsr"><div class="gdot" id="gdot-claude"></div><span id="gstatus-claude">Not configured</span></div>
           </div>
           <div class="ss">
             <div class="st">Company</div>
@@ -750,8 +763,11 @@ function setPhoto(data){
   photo=data;
   const a=document.getElementById('photo-area');a.classList.add('has-photo');
   a.innerHTML=`<img src="${data}" alt=""><div class="pov"><button class="btn btn-sm" onclick="event.stopPropagation();openCamera()">Retake</button><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();clearPhoto()">Remove</button></div>`;
+  // Show AI read button if Claude key configured
+  const aiBtn=document.getElementById('ai-read-btn');
+  if(aiBtn){aiBtn.style.display=settings.claudeKey?'flex':'none';}
 }
-function clearPhoto(){photo=null;const a=document.getElementById('photo-area');a.classList.remove('has-photo');a.innerHTML='<span style="font-size:1.5rem">📷</span><span style="font-size:0.78rem;color:var(--text-dim)">Tap to photograph meter</span>';}
+function clearPhoto(){photo=null;const a=document.getElementById('photo-area');a.classList.remove('has-photo');a.innerHTML='<span style="font-size:1.5rem">📷</span><span style="font-size:0.78rem;color:var(--text-dim)">Tap to photograph meter</span>';const aiBtn=document.getElementById('ai-read-btn');if(aiBtn)aiBtn.style.display='none';}
 function closeCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}document.getElementById('cam-modal').style.display='none';}
 /* VALIDATION */
 function validateRead(){
@@ -1103,18 +1119,75 @@ function loadSettings(){
   document.getElementById('set-client-id').value=settings.clientId||'';
   document.getElementById('set-sheet-id').value=settings.sheetId||'';
   document.getElementById('set-folder-id').value=settings.folderId||'';
+  document.getElementById('set-claude-key').value=settings.claudeKey||'';
   document.getElementById('set-company').value=settings.company||'';
   document.getElementById('set-tech').value=settings.tech||'';
-  updateGS();
+  updateGS();updateClaudeStatus();
 }
 function saveSettings(){
   settings.clientId=document.getElementById('set-client-id').value.trim();
   settings.sheetId=document.getElementById('set-sheet-id').value.trim();
   settings.folderId=document.getElementById('set-folder-id').value.trim();
+  settings.claudeKey=document.getElementById('set-claude-key').value.trim();
   settings.company=document.getElementById('set-company').value.trim();
   settings.tech=document.getElementById('set-tech').value.trim();
   localStorage.setItem('cms_s3',JSON.stringify(settings));
-  updateGS();if(settings.clientId)initGoogle();toast('Saved!','success');
+  updateGS();updateClaudeStatus();if(settings.clientId)initGoogle();toast('Saved!','success');
+}
+function updateClaudeStatus(){
+  const dot=document.getElementById('gdot-claude'),txt=document.getElementById('gstatus-claude');
+  if(!dot)return;
+  if(settings.claudeKey){dot.className='gdot ok';txt.textContent='API key configured';}
+  else{dot.className='gdot';txt.textContent='Not configured';}
+}
+async function readMeterPhoto(){
+  if(!photo){toast('Take a photo first','error');return;}
+  if(!settings.claudeKey){toast('Add Claude API key in Settings','error');return;}
+  const btn=document.getElementById('ai-read-text');
+  btn.textContent='Reading meter…';
+  try{
+    // Extract base64 and media type from data URL
+    const match=photo.match(/^data:(image\/\w+);base64,(.+)$/);
+    if(!match){toast('Invalid photo format','error');btn.textContent='Read Meter with AI';return;}
+    const mediaType=match[1], base64Data=match[2];
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'x-api-key':settings.claudeKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true',
+        'content-type':'application/json'
+      },
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:100,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:mediaType,data:base64Data}},
+          {type:'text',text:'Look at this water meter photo. Read the meter display digits. Return ONLY the numeric reading as a plain number (no commas, no units, no text). If you cannot read it clearly, return UNREADABLE.'}
+        ]}]
+      })
+    });
+    if(!resp.ok){
+      const err=await resp.text();
+      toast('API error: '+resp.status,'error');
+      btn.textContent='Read Meter with AI';
+      return;
+    }
+    const data=await resp.json();
+    const reading=data.content[0].text.trim();
+    if(reading==='UNREADABLE'||isNaN(reading)){
+      toast('Could not read meter — enter manually','error');
+      btn.textContent='Read Meter with AI';
+      return;
+    }
+    document.getElementById('f-curr-read').value=reading;
+    updateCons();
+    toast('Meter read: '+parseFloat(reading).toLocaleString(),'success');
+    btn.textContent='✓ Read: '+parseFloat(reading).toLocaleString();
+  }catch(e){
+    toast('Error: '+e.message,'error');
+    btn.textContent='Read Meter with AI';
+  }
 }
 function updateGS(){
   const dot=document.getElementById('gdot'),txt=document.getElementById('gstatus-txt');

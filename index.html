@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#f0f4f8">
 <link rel="manifest" href="manifest.json">
 <title>CMS Meter Reads</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -237,6 +238,50 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   .sidebar { position: fixed; top: var(--header-h); left: 0; bottom: 0; z-index: 30; box-shadow: 4px 0 18px rgba(0,0,0,0.1); }
   .sidebar.collapsed { box-shadow: none; }
 }
+/* ROUTES */
+.route-upload { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:0.85rem; }
+.route-upload-box { flex:1; min-width:200px; background:var(--surface); border:2px dashed var(--border); border-radius:var(--radius); padding:0.8rem; text-align:center; cursor:pointer; transition:border-color 0.2s; }
+.route-upload-box:hover { border-color:var(--accent); }
+.route-upload-box.loaded { border-style:solid; border-color:var(--success); background:var(--success-bg); }
+.route-upload-box input[type=file] { display:none; }
+.route-upload-box .rub-label { font-size:0.78rem; font-weight:500; color:var(--text-muted); }
+.route-upload-box .rub-status { font-size:0.68rem; color:var(--text-dim); margin-top:4px; }
+.route-filter-row { display:flex; gap:8px; align-items:center; margin-bottom:0.7rem; flex-wrap:wrap; }
+.route-filter-row select { background:#fff; border:1px solid var(--border); border-radius:7px; color:var(--text); font-family:var(--font); font-size:0.76rem; padding:7px 8px; outline:none; }
+.route-select-bar { display:flex; align-items:center; gap:8px; margin-bottom:0.7rem; padding:6px 10px; background:var(--surface); border:1px solid var(--border); border-radius:7px; font-size:0.78rem; }
+.route-select-bar label { display:flex; align-items:center; gap:5px; cursor:pointer; font-weight:500; color:var(--text-muted); }
+.route-select-bar .rsel-count { font-family:var(--mono); font-size:0.74rem; color:var(--accent-text); margin-left:auto; }
+.route-tree { margin-bottom:80px; }
+.rt-boro { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:6px; overflow:hidden; }
+.rt-boro-hd { display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; user-select:none; font-weight:600; font-size:0.85rem; transition:background 0.12s; }
+.rt-boro-hd:hover { background:var(--surface2); }
+.rt-boro-hd .rt-arr { width:14px; height:14px; color:var(--text-dim); transition:transform 0.18s; flex-shrink:0; }
+.rt-boro-hd.open .rt-arr { transform:rotate(90deg); }
+.rt-boro-hd .rt-badge { font-size:0.66rem; font-family:var(--mono); background:var(--surface2); color:var(--text-dim); padding:1px 7px; border-radius:10px; margin-left:auto; }
+.rt-boro-body { display:none; border-top:1px solid var(--border2); }
+.rt-boro-body.open { display:block; }
+.rt-hood { border-bottom:1px solid var(--border2); }
+.rt-hood:last-child { border-bottom:none; }
+.rt-hood-hd { display:flex; align-items:center; gap:7px; padding:8px 12px 8px 20px; cursor:pointer; user-select:none; font-size:0.8rem; font-weight:500; color:var(--text-muted); transition:background 0.12s; }
+.rt-hood-hd:hover { background:var(--surface2); }
+.rt-hood-hd .rt-arr { width:12px; height:12px; color:var(--text-dim); transition:transform 0.18s; flex-shrink:0; }
+.rt-hood-hd.open .rt-arr { transform:rotate(90deg); }
+.rt-hood-hd .rt-badge { font-size:0.64rem; font-family:var(--mono); background:var(--surface2); color:var(--text-dim); padding:1px 6px; border-radius:10px; margin-left:auto; }
+.rt-hood-body { display:none; background:var(--surface3); }
+.rt-hood-body.open { display:block; }
+.rt-bldg { display:flex; align-items:center; gap:8px; padding:7px 12px 7px 36px; border-bottom:1px solid var(--border2); font-size:0.78rem; transition:background 0.1s; }
+.rt-bldg:last-child { border-bottom:none; }
+.rt-bldg:hover { background:var(--surface2); }
+.rt-bldg input[type=checkbox] { flex-shrink:0; accent-color:var(--accent); width:15px; height:15px; cursor:pointer; }
+.rt-bldg-info { flex:1; min-width:0; }
+.rt-bldg-addr { font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rt-bldg-meta { font-size:0.68rem; color:var(--text-dim); margin-top:1px; display:flex; gap:8px; flex-wrap:wrap; }
+.rt-cycle-badge { font-size:0.62rem; padding:1px 5px; border-radius:8px; font-weight:600; background:var(--accent-dim); color:var(--accent-text); white-space:nowrap; }
+.rt-status-badge { font-size:0.62rem; padding:1px 5px; border-radius:8px; font-weight:600; white-space:nowrap; }
+.rt-status-badge.st-active { background:var(--success-bg); color:var(--success); }
+.rt-status-badge.st-other { background:var(--warning-bg); color:var(--warning); }
+.route-create-bar { position:sticky; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); padding:12px 1.1rem; display:flex; align-items:center; gap:10px; z-index:10; }
+.route-create-bar .btn { flex:1; justify-content:center; padding:12px; font-size:0.88rem; }
 </style>
 </head>
 <body>
@@ -267,6 +312,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div class="tabs">
         <div class="tab active" data-tab="new-read">New Read</div>
         <div class="tab" data-tab="records">Records <span class="tc" id="tab-count">0</span></div>
+        <div class="tab" data-tab="routes">Routes</div>
         <div class="tab" data-tab="settings">Settings</div>
       </div>
       <div class="content">
@@ -364,6 +410,38 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           </div>
           <div class="rl" id="records-list">
             <div class="empty"><div class="ei">📋</div><p>No reads yet.</p></div>
+          </div>
+        </div>
+        <!-- ROUTES PANE -->
+        <div class="pane" id="pane-routes">
+          <div class="fs">
+            <div class="fs-title">Upload Route Files</div>
+            <div class="route-upload">
+              <div class="route-upload-box" id="rub-cycle" onclick="document.getElementById('route-file-cycle').click()">
+                <div class="rub-label">rd_cycle.xlsx</div>
+                <div class="rub-status" id="rub-cycle-status">Click to upload</div>
+                <input type="file" id="route-file-cycle" accept=".xlsx,.xls" onchange="loadRouteFile(this,'cycle')">
+              </div>
+              <div class="route-upload-box" id="rub-req" onclick="document.getElementById('route-file-req').click()">
+                <div class="rub-label">rd_req.xlsx</div>
+                <div class="rub-status" id="rub-req-status">Click to upload</div>
+                <input type="file" id="route-file-req" accept=".xlsx,.xls" onchange="loadRouteFile(this,'req')">
+              </div>
+            </div>
+          </div>
+          <div class="route-filter-row">
+            <select id="route-cycle-filter" onchange="filterRoutes()"><option value="">All Cycles</option></select>
+            <select id="route-status-filter" onchange="filterRoutes()"><option value="">All Statuses</option></select>
+          </div>
+          <div class="route-select-bar">
+            <label><input type="checkbox" id="route-select-all" onchange="toggleSelectAllRoute(this.checked)"> Select All</label>
+            <span class="rsel-count" id="route-sel-count">0 selected</span>
+          </div>
+          <div class="route-tree" id="route-tree">
+            <div class="empty"><div class="ei">📂</div><p>Upload rd_cycle.xlsx and/or rd_req.xlsx to see buildings.</p></div>
+          </div>
+          <div class="route-create-bar" id="route-create-bar" style="display:none">
+            <button class="btn btn-accent" onclick="createRoute()">Create Route</button>
           </div>
         </div>
         <!-- SETTINGS PANE -->
@@ -1011,6 +1089,287 @@ window.addEventListener('offline',updateOnline);
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
 /* INIT */
 initDB().then(()=>{loadSettings();updateTabCount();renderSidebar();initGPS();updateOnline();if(settings.clientId)initGoogle();});
+/* ===== ROUTE BUILDER ===== */
+let routeCycleData=[], routeReqData=[], routeMerged=[], routeSelected=new Set();
+let routeBoroOpen=new Set(), routeHoodOpen=new Set();
+const BORO_MAP={'01':'Manhattan','02':'Bronx','03':'Brooklyn','04':'Queens','05':'Staten Island'};
+function loadRouteFile(input,type){
+  const file=input.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(type==='cycle'){
+        routeCycleData=data;
+        document.getElementById('rub-cycle').classList.add('loaded');
+        document.getElementById('rub-cycle-status').textContent=data.length+' rows loaded';
+      }else{
+        routeReqData=data;
+        document.getElementById('rub-req').classList.add('loaded');
+        document.getElementById('rub-req-status').textContent=data.length+' rows loaded';
+      }
+      mergeAndRenderRoute();
+    }catch(err){toast('Error reading file: '+err.message,'error');}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function mergeAndRenderRoute(){
+  const byAcct={};
+  // Process cycle data
+  routeCycleData.forEach(r=>{
+    const acct=String(r.ACCT||'').trim(); if(!acct)return;
+    if(!byAcct[acct])byAcct[acct]={};
+    const rec=byAcct[acct];
+    rec.acct=acct;
+    rec.address=r.ADDRESS||r['ADDRESS.1']||'';
+    rec.bbl=String(r.BBL||'');
+    rec.cycle=String(r.RDG_CYCLE||r.BILL_CYCLE||'');
+    rec.status=String(r.STATUS||'');
+    rec.companyName=r.CMPNYNME||'';
+    rec.routeNumber=String(r.ROUTE_NUMBER||'');
+    rec.stopNumber=r.STOP_NMBR||'';
+    rec.readBy=r.RDG_BY||'';
+    rec.lastBilled=r.LST_BILLED||'';
+    rec.timeFrom=r.TIME_FR||'';
+    rec.timeTo=r.TIME_TO||'';
+    rec.specialInstruct=r.SCL_INSTRUCT||'';
+    // Parse boro and neighborhood from ROUTE_NUMBER
+    if(rec.routeNumber && rec.routeNumber.includes(' - ')){
+      const parts=rec.routeNumber.split(' - ');
+      const boroCode=parts[0].trim();
+      rec.boro=BORO_MAP[boroCode]||'Unknown';
+      rec.neighborhood=parts.slice(1).join(' - ').trim();
+    }else{
+      // fallback to BBL
+      const bblPre=rec.bbl.substring(0,2);
+      rec.boro=BORO_MAP[bblPre]||'Unknown';
+      rec.neighborhood='Unassigned';
+    }
+  });
+  // Process req data
+  routeReqData.forEach(r=>{
+    const acct=String(r.ACCT||'').trim(); if(!acct)return;
+    if(!byAcct[acct])byAcct[acct]={};
+    const rec=byAcct[acct];
+    rec.acct=acct;
+    if(!rec.address)rec.address=r.ADDRESS||'';
+    if(!rec.bbl)rec.bbl=String(r.BBL||'');
+    if(!rec.cycle)rec.cycle=String(r.CYCLE||'');
+    if(!rec.status)rec.status=String(r.STATUS||'');
+    rec.meterNum=r.MTR_NUM||rec.meterNum||'';
+    rec.prevRead=r.PRV_READ||rec.prevRead||'';
+    rec.owner=r.OWNER||rec.owner||'';
+    rec.reason=r.REASON||'';
+    rec.source=r.SOURCE||'';
+    rec.ourNote=r.OUR_NOTE||'';
+    rec.readNote=r.READ_NOTE||'';
+    rec.wantBy=r.WANTBY||'';
+    rec.assignTo=r.ASSNTO||'';
+    rec.createdDate=r.CREATDT||'';
+    // If no boro assigned yet, derive from BBL
+    if(!rec.boro){
+      const bblPre=(rec.bbl||'').substring(0,2);
+      rec.boro=BORO_MAP[bblPre]||'Unknown';
+      rec.neighborhood='Unassigned';
+    }
+  });
+  routeMerged=Object.values(byAcct);
+  // Populate filter dropdowns
+  const cycles=new Set(), statuses=new Set();
+  routeMerged.forEach(r=>{
+    if(r.cycle)cycles.add(r.cycle);
+    if(r.status)statuses.add(r.status);
+  });
+  const cycSel=document.getElementById('route-cycle-filter');
+  const stSel=document.getElementById('route-status-filter');
+  const curCyc=cycSel.value, curSt=stSel.value;
+  cycSel.innerHTML='<option value="">All Cycles</option>';
+  [...cycles].sort().forEach(c=>{cycSel.innerHTML+=`<option value="${c}">${c}</option>`;});
+  cycSel.value=curCyc;
+  stSel.innerHTML='<option value="">All Statuses</option>';
+  [...statuses].sort().forEach(s=>{stSel.innerHTML+=`<option value="${s}">${s}</option>`;});
+  stSel.value=curSt;
+  filterRoutes();
+}
+function filterRoutes(){
+  const cycF=document.getElementById('route-cycle-filter').value;
+  const stF=document.getElementById('route-status-filter').value;
+  const filtered=routeMerged.filter(r=>{
+    if(cycF&&r.cycle!==cycF)return false;
+    if(stF&&r.status!==stF)return false;
+    return true;
+  });
+  renderRouteTree(filtered);
+}
+function renderRouteTree(buildings){
+  const container=document.getElementById('route-tree');
+  const bar=document.getElementById('route-create-bar');
+  if(!buildings.length){
+    container.innerHTML='<div class="empty"><div class="ei">📂</div><p>No buildings match the current filters.</p></div>';
+    bar.style.display='none';
+    updateRouteSelCount();
+    return;
+  }
+  bar.style.display='flex';
+  // Group: boro -> neighborhood -> buildings
+  const tree={};
+  buildings.forEach(b=>{
+    const boro=b.boro||'Unknown';
+    const hood=b.neighborhood||'Unassigned';
+    if(!tree[boro])tree[boro]={};
+    if(!tree[boro][hood])tree[boro][hood]=[];
+    tree[boro][hood].push(b);
+  });
+  const arrSvg='<svg class="rt-arr" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  let html='';
+  const boroKeys=Object.keys(tree).sort();
+  boroKeys.forEach(boro=>{
+    const hoods=tree[boro];
+    const boroTotal=Object.values(hoods).reduce((s,a)=>s+a.length,0);
+    const boroSel=Object.values(hoods).reduce((s,a)=>s+a.filter(b=>routeSelected.has(b.acct)).length,0);
+    const boroOpen=routeBoroOpen.has(boro);
+    const boroChecked=boroSel===boroTotal&&boroTotal>0;
+    const boroIndet=boroSel>0&&boroSel<boroTotal;
+    html+=`<div class="rt-boro">
+<div class="rt-boro-hd${boroOpen?' open':''}" onclick="toggleBoro('${esc(boro)}')">
+  ${arrSvg}
+  <input type="checkbox" ${boroChecked?'checked':''} onclick="event.stopPropagation();selectBoro('${esc(boro)}',this.checked)" style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer">
+  <span>${boro}</span>
+  <span class="rt-badge">${boroSel}/${boroTotal}</span>
+</div>
+<div class="rt-boro-body${boroOpen?' open':''}">`;
+    const hoodKeys=Object.keys(hoods).sort();
+    hoodKeys.forEach(hood=>{
+      const bldgs=hoods[hood];
+      const hoodSel=bldgs.filter(b=>routeSelected.has(b.acct)).length;
+      const hoodOpen=routeHoodOpen.has(boro+'|'+hood);
+      const hoodChecked=hoodSel===bldgs.length&&bldgs.length>0;
+      html+=`<div class="rt-hood">
+<div class="rt-hood-hd${hoodOpen?' open':''}" onclick="toggleNeighborhood('${esc(boro)}','${esc(hood)}')">
+  ${arrSvg}
+  <input type="checkbox" ${hoodChecked?'checked':''} onclick="event.stopPropagation();selectNeighborhood('${esc(boro)}','${esc(hood)}',this.checked)" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
+  <span>${hood}</span>
+  <span class="rt-badge">${hoodSel}/${bldgs.length}</span>
+</div>
+<div class="rt-hood-body${hoodOpen?' open':''}">`;
+      bldgs.forEach(b=>{
+        const chk=routeSelected.has(b.acct);
+        const stClass=b.status&&b.status.toLowerCase()==='active'?'st-active':'st-other';
+        html+=`<div class="rt-bldg">
+  <input type="checkbox" ${chk?'checked':''} onchange="selectBuilding('${esc(b.acct)}',this.checked)">
+  <div class="rt-bldg-info">
+    <div class="rt-bldg-addr">${b.address||'(No address)'}</div>
+    <div class="rt-bldg-meta">
+      <span>Acct: ${b.acct}</span>
+      ${b.meterNum?'<span>Mtr: '+b.meterNum+'</span>':''}
+    </div>
+  </div>
+  ${b.cycle?'<span class="rt-cycle-badge">'+b.cycle+'</span>':''}
+  ${b.status?'<span class="rt-status-badge '+stClass+'">'+b.status+'</span>':''}
+</div>`;
+      });
+      html+=`</div></div>`;
+    });
+    html+=`</div></div>`;
+  });
+  container.innerHTML=html;
+  updateRouteSelCount();
+}
+function toggleBoro(boro){
+  if(routeBoroOpen.has(boro))routeBoroOpen.delete(boro);else routeBoroOpen.add(boro);
+  filterRoutes();
+}
+function toggleNeighborhood(boro,hood){
+  const key=boro+'|'+hood;
+  if(routeHoodOpen.has(key))routeHoodOpen.delete(key);else routeHoodOpen.add(key);
+  filterRoutes();
+}
+function selectBoro(boro,checked){
+  routeMerged.forEach(b=>{
+    if((b.boro||'Unknown')===boro){
+      const cycF=document.getElementById('route-cycle-filter').value;
+      const stF=document.getElementById('route-status-filter').value;
+      if(cycF&&b.cycle!==cycF)return;
+      if(stF&&b.status!==stF)return;
+      if(checked)routeSelected.add(b.acct);else routeSelected.delete(b.acct);
+    }
+  });
+  filterRoutes();
+}
+function selectNeighborhood(boro,hood,checked){
+  routeMerged.forEach(b=>{
+    if((b.boro||'Unknown')===boro&&(b.neighborhood||'Unassigned')===hood){
+      const cycF=document.getElementById('route-cycle-filter').value;
+      const stF=document.getElementById('route-status-filter').value;
+      if(cycF&&b.cycle!==cycF)return;
+      if(stF&&b.status!==stF)return;
+      if(checked)routeSelected.add(b.acct);else routeSelected.delete(b.acct);
+    }
+  });
+  filterRoutes();
+}
+function selectBuilding(acct,checked){
+  if(checked)routeSelected.add(acct);else routeSelected.delete(acct);
+  filterRoutes();
+}
+function toggleSelectAllRoute(checked){
+  const cycF=document.getElementById('route-cycle-filter').value;
+  const stF=document.getElementById('route-status-filter').value;
+  routeMerged.forEach(b=>{
+    if(cycF&&b.cycle!==cycF)return;
+    if(stF&&b.status!==stF)return;
+    if(checked)routeSelected.add(b.acct);else routeSelected.delete(b.acct);
+  });
+  filterRoutes();
+}
+function updateRouteSelCount(){
+  document.getElementById('route-sel-count').textContent=routeSelected.size+' selected';
+  document.getElementById('route-select-all').checked=routeSelected.size>0&&routeSelected.size===routeMerged.filter(b=>{
+    const cycF=document.getElementById('route-cycle-filter').value;
+    const stF=document.getElementById('route-status-filter').value;
+    if(cycF&&b.cycle!==cycF)return false;
+    if(stF&&b.status!==stF)return false;
+    return true;
+  }).length;
+}
+async function createRoute(){
+  if(!routeSelected.size){toast('Select buildings first','error');return;}
+  const selected=routeMerged.filter(b=>routeSelected.has(b.acct));
+  let created=0;
+  for(const b of selected){
+    const rec={
+      id:Date.now()+'-'+Math.random().toString(36).slice(2,7)+'-'+created,
+      ts:Date.now(),
+      account:b.acct||'',
+      address:b.address||'',
+      meter:b.meterNum||'',
+      unit:'',
+      type:'water',
+      prevRead:b.prevRead?parseFloat(String(b.prevRead).replace(/,/g,'')):null,
+      currRead:0,
+      consumption:null,
+      notes:'',
+      photo:null,
+      tech:settings.tech||'',
+      status:'pending',
+      driveUrl:null,
+      contactName:b.owner||b.companyName||'',
+      contactPhone:'',
+      contactEmail:'',
+      accessNotes:b.specialInstruct||'',
+      gpsLat:null,gpsLng:null,
+      flagged:false,
+    };
+    await save(rec);
+    created++;
+  }
+  routeSelected.clear();
+  toast(created+' building'+(created!==1?'s':'')+' added to route!','success');
+  updateTabCount();renderSidebar();
+  switchTab('new-read');
+}
 </script>
 </body>
 </html>

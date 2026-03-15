@@ -826,7 +826,7 @@ document.getElementById('btn-save').addEventListener('click',async()=>{
   };
   await save(rec);
   toast('Read saved!','success');
-  clearForm();updateTabCount();renderSidebar();
+  clearForm();await updateTabCount();await renderSidebar();
 });
 function clearForm(){
   ['f-account','f-meter','f-address','f-unit','f-notes','f-prev-read','f-curr-read','f-contact-name','f-contact-phone','f-contact-email','f-access-notes'].forEach(id=>document.getElementById(id).value='');

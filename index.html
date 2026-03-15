@@ -626,9 +626,9 @@ async function renderSidebar(){
       const latest=mrs[0]; // already sorted newest first
       const days=Math.floor((Date.now()-latest.ts)/86400000);
       const dotC=days<=30?'ok':days<=60?'warn':'';
+      const isRoute=latest.status==='route';
       const badge=isRoute?`<span class="m-badge bp">Route</span>`:days<=30?`<span class="m-badge b-ok">Recent</span>`:days<=90?`<span class="m-badge b-warn">${days}d</span>`:`<span class="m-badge b-old">${days}d</span>`;
       const isSel=selMeter===mk;
-      const isRoute=latest.status==='route';
       const displayRead=isRoute?latest.prevRead:latest.currRead;
       const lastReadStr=(displayRead!=null?displayRead.toLocaleString():'—')+' '+(TU[latest.type]||'');
       const lastDateStr=isRoute?'Needs reading':new Date(latest.ts).toLocaleDateString();

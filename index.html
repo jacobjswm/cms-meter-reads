@@ -377,6 +377,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             </div>
             <div style="display:flex;gap:7px;flex-wrap:wrap">
               <button class="btn btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+              <button class="btn btn-sm" onclick="document.getElementById('csv-import-input').click()">↑ Import CSV</button>
+              <input type="file" id="csv-import-input" accept=".csv" style="display:none" onchange="importCSV(this)">
               <button class="btn btn-sm btn-danger" onclick="clearAllData()">⚠ Clear all</button>
             </div>
           </div>
@@ -857,6 +859,102 @@ async function exportCSV(){
   const csv=[hdrs,...rows].map(r=>r.join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`cms_reads_${new Date().toISOString().slice(0,10)}.csv`;a.click();
   toast('Exported!','success');
+}
+/* CSV IMPORT */
+async function importCSV(input){
+  const file=input.files[0];if(!file){return;}
+  const text=await file.text();
+  input.value='';
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){toast('CSV has no data rows','error');return;}
+  // Parse headers
+  const hdrs=parseCSVRow(lines[0]).map(h=>h.trim().toLowerCase());
+  // Build column map: csv header -> record field
+  const colMap={};
+  const aliases={
+    'account':['account','account #','account number','acct','acct #','acct number'],
+    'address':['address','service address','location','street','addr'],
+    'unit':['unit','unit #','unit number','apt','apartment','suite'],
+    'meter':['meter','meter #','meter number','meter no','meter_number','meter id'],
+    'type':['type','meter type','metertype','service type','utility'],
+    'prevRead':['prev','previous','previous read','prev read','prevread','prior read','prior','last read'],
+    'currRead':['curr','current','current read','curr read','currread','reading','read'],
+    'notes':['notes','note','comments','comment','remarks'],
+    'tech':['tech','technician','reader','employee'],
+    'contactName':['contact','contact name','contactname','owner','tenant'],
+    'contactPhone':['phone','contact phone','contactphone','telephone','tel'],
+    'contactEmail':['email','contact email','contactemail','e-mail'],
+    'accessNotes':['access','access notes','accessnotes','access info','entry'],
+    'gpsLat':['gps lat','gpslat','latitude','lat'],
+    'gpsLng':['gps lng','gpslng','longitude','lng','lon'],
+    'status':['status'],
+    'consumption':['consumption','usage','cons'],
+    'flagged':['flagged','flag'],
+  };
+  hdrs.forEach((h,i)=>{
+    for(const[field,names]of Object.entries(aliases)){
+      if(names.includes(h)){colMap[i]=field;break;}
+    }
+  });
+  if(Object.keys(colMap).length===0){toast('No matching columns found in CSV','error');return;}
+  // Parse data rows
+  let imported=0;
+  const validTypes=new Set(['water','gas','electric','sewer','other']);
+  for(let i=1;i<lines.length;i++){
+    const vals=parseCSVRow(lines[i]);
+    if(!vals.length||vals.every(v=>!v.trim()))continue;
+    const rec={
+      id:Date.now()+'-'+Math.random().toString(36).slice(2,7)+'-'+i,
+      ts:Date.now(),account:'',address:'',meter:'',unit:'',type:'water',
+      prevRead:null,currRead:0,consumption:null,notes:'',photo:null,
+      tech:settings.tech||'',status:'pending',driveUrl:null,
+      contactName:'',contactPhone:'',contactEmail:'',accessNotes:'',
+      gpsLat:null,gpsLng:null,flagged:false,
+    };
+    for(const[ci,field]of Object.entries(colMap)){
+      const v=(vals[parseInt(ci)]||'').trim();
+      if(!v)continue;
+      if(field==='prevRead'||field==='currRead'||field==='consumption'){
+        const n=parseFloat(v.replace(/,/g,''));
+        if(!isNaN(n))rec[field]=n;
+      }else if(field==='gpsLat'||field==='gpsLng'){
+        const n=parseFloat(v);if(!isNaN(n))rec[field]=n;
+      }else if(field==='flagged'){
+        rec[field]=(v.toLowerCase()==='y'||v.toLowerCase()==='yes'||v==='1'||v.toLowerCase()==='true');
+      }else if(field==='type'){
+        rec[field]=validTypes.has(v.toLowerCase())?v.toLowerCase():'water';
+      }else if(field==='status'){
+        rec[field]=(v==='synced'||v==='pending')?v:'pending';
+      }else{
+        rec[field]=v;
+      }
+    }
+    // Compute consumption if prev and curr present but consumption wasn't in CSV
+    if(rec.prevRead!=null&&rec.currRead!=null&&rec.consumption==null){
+      rec.consumption=rec.currRead-rec.prevRead;
+    }
+    await save(rec);
+    imported++;
+  }
+  toast(imported+' record'+(imported!==1?'s':'')+' imported!','success');
+  renderRecords();updateTabCount();renderSidebar();renderStats();
+}
+function parseCSVRow(line){
+  const result=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(inQ){
+      if(c==='"'&&line[i+1]==='"'){cur+='"';i++;}
+      else if(c==='"'){inQ=false;}
+      else cur+=c;
+    }else{
+      if(c==='"'){inQ=true;}
+      else if(c===','){result.push(cur);cur='';}
+      else cur+=c;
+    }
+  }
+  result.push(cur);
+  return result;
 }
 /* SETTINGS */
 function loadSettings(){

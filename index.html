@@ -301,7 +301,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
       <div class="sb-head">
-        <h2>Properties</h2>
+        <h2>Properties <span id="sb-route-count" style="font-weight:400;color:var(--accent-text);font-size:0.65rem"></span></h2>
         <input class="sb-search" id="sb-search" type="search" placeholder="Search address, meter…">
       </div>
       <div class="sb-scroll" id="sb-scroll">
@@ -583,13 +583,30 @@ const TU={water:'CCF','water-gal':'gal',other:''};
 const TL={water:'Water (CCF)','water-gal':'Water (gal)',other:'Other'};
 async function renderSidebar(){
   const all=await getAll();
+  // Sidebar shows only route entries (needs reading). Completed reads go to Records tab.
+  const routeOnly=all.filter(r=>r.status==='route');
+  const items=routeOnly.length?routeOnly:all.filter(r=>false); // empty if no routes
   const q=document.getElementById('sb-search').value.toLowerCase();
   const scroll=document.getElementById('sb-scroll');
   const empty=document.getElementById('sb-empty');
-  if(!all.length){empty.style.display='block';scroll.innerHTML='';scroll.appendChild(empty);return;}
+  // Show route progress
+  const totalRoute=all.filter(r=>r.status==='route').length;
+  const doneRoute=all.filter(r=>r.status!=='route'&&r.status!=='synced'?false:true).length-all.filter(r=>r.status==='route').length;
+  if(!items.length){
+    const doneCount=all.filter(r=>r.status==='pending'||r.status==='synced').length;
+    empty.style.display='block';
+    empty.innerHTML=doneCount?'All route entries read! ✅<br><small>'+doneCount+' reads in Records tab</small>':'No route loaded.<br>Go to Routes tab to create one.';
+    scroll.innerHTML='';scroll.appendChild(empty);return;
+  }
+  // Update route counter in sidebar header
+  const rcEl=document.getElementById('sb-route-count');
+  if(rcEl){
+    const done=all.filter(r=>r.status==='pending'||r.status==='synced').length;
+    rcEl.textContent=items.length+' remaining'+(done?' · '+done+' done':'');
+  }
   // Group address -> records[]
   const g={};
-  all.forEach(r=>{
+  items.forEach(r=>{
     const addr=r.address||'(No address)';
     if(!g[addr])g[addr]=[];
     g[addr].push(r);

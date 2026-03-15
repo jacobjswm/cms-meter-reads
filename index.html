@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f0f4f8">
 <link rel="manifest" href="manifest.json">
@@ -290,7 +290,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="header">
     <div class="header-left">
       <button class="hbtn" id="sb-toggle"><span></span><span></span><span></span></button>
-      <div class="logo">CMS <small>METER READS</small> <span id="online-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--success);margin-left:4px;vertical-align:middle" title="Online"></span></div>
+      <div class="logo">CMS <small>METER READS</small> <span style="font-size:0.58rem;color:var(--text-dim);font-weight:400;margin-left:3px">v1.5</span> <span id="online-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--success);margin-left:4px;vertical-align:middle" title="Online"></span></div>
     </div>
     <div class="hacts">
       <button class="btn btn-sm" onclick="exportCSV()">↓ CSV</button>
@@ -302,6 +302,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="sidebar" id="sidebar">
       <div class="sb-head">
         <h2>Properties <span id="sb-route-count" style="font-weight:400;color:var(--accent-text);font-size:0.65rem"></span></h2>
+        <div id="route-progress-bar" style="display:none;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--text-dim);margin-bottom:3px"><span id="rp-label">0/0 read</span><span id="rp-pct">0%</span></div>
+          <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden"><div id="rp-fill" style="height:100%;background:var(--accent);border-radius:3px;transition:width 0.3s;width:0%"></div></div>
+        </div>
         <input class="sb-search" id="sb-search" type="search" placeholder="Search address, meter…">
       </div>
       <div class="sb-scroll" id="sb-scroll">
@@ -537,7 +541,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="di"><label>Contact</label><div class="dv" id="det-contact" style="font-size:0.76rem;font-family:var(--font)">—</div></div>
       </div>
       <div class="dn" id="det-contact-info" style="display:none"><label>Contact Details</label><p id="det-contact-txt"></p></div>
-      <div class="dn" id="det-nw" style="display:none"><label>Notes</label><p id="det-ntxt"></p></div>
+      <div class="dn" id="det-nw" style="display:none"><label>Building Notes</label><p id="det-ntxt"></p></div>
+      <div class="dn" id="det-mnw" style="display:none"><label>Meter Notes</label><p id="det-mntxt"></p></div>
       <div class="mft">
         <button class="btn btn-danger btn-sm" id="det-del">Delete</button>
         <button class="btn btn-sm" id="det-edit" style="margin-left:6px">✏ Edit</button>
@@ -618,12 +623,22 @@ async function renderSidebar(){
     empty.innerHTML=doneCount?'All route entries read! ✅<br><small>'+doneCount+' reads in Records tab</small>':'No route loaded.<br>Go to Routes tab to create one.';
     scroll.innerHTML='';scroll.appendChild(empty);return;
   }
-  // Update route counter in sidebar header
+  // Update route counter + progress bar
   const rcEl=document.getElementById('sb-route-count');
+  const done=all.filter(r=>r.status==='pending'||r.status==='synced').length;
+  const total=items.length+done;
   if(rcEl){
-    const done=all.filter(r=>r.status==='pending'||r.status==='synced').length;
     rcEl.textContent=items.length+' remaining'+(done?' · '+done+' done':'');
   }
+  const rpBar=document.getElementById('route-progress-bar');
+  if(rpBar&&total>0){
+    rpBar.style.display='block';
+    const pct=Math.round((done/total)*100);
+    document.getElementById('rp-label').textContent=done+'/'+total+' read';
+    document.getElementById('rp-pct').textContent=pct+'%';
+    document.getElementById('rp-fill').style.width=pct+'%';
+    document.getElementById('rp-fill').style.background=pct===100?'var(--success)':'var(--accent)';
+  }else if(rpBar){rpBar.style.display='none';}
   // Group address -> records[]
   const g={};
   items.forEach(r=>{
@@ -723,7 +738,7 @@ async function pickMeter(addr,unit,mk,account,meter,type,lastRead){
   renderSidebar();
   document.getElementById('f-curr-read').focus();
 }
-function dismissBanner(){document.getElementById('pf-banner').style.display='none';}
+function dismissBanner(){document.getElementById('pf-banner').style.display='none';clearForm();}
 document.getElementById('sb-search').addEventListener('input',renderSidebar);
 /* TABS */
 function switchTab(name){
@@ -820,7 +835,8 @@ document.getElementById('btn-save').addEventListener('click',async()=>{
   if(flags.length&&!hasErr&&!confirm('Reading has warnings. Save anyway?'))return;
   // Check if this is updating a route entry
   const allRecs=await getAll();
-  const routeMatch=allRecs.find(r=>r.status==='route'&&r.account===account&&(r.meter===document.getElementById('f-meter').value.trim()||!r.meter));
+  const meterVal=document.getElementById('f-meter').value.trim();
+  const routeMatch=account?allRecs.find(r=>r.status==='route'&&r.account===account&&(r.meter===meterVal||!r.meter||!meterVal)):null;
   const rec=routeMatch?Object.assign(routeMatch,{
     ts:Date.now(),
     address,meter:document.getElementById('f-meter').value.trim(),
@@ -937,6 +953,8 @@ async function openDetail(id){
   if(rec.photo){ph.src=rec.photo;ph.style.display='block';}else ph.style.display='none';
   const nw=document.getElementById('det-nw');
   if(rec.notes){nw.style.display='block';document.getElementById('det-ntxt').textContent=rec.notes;}else nw.style.display='none';
+  const mnw=document.getElementById('det-mnw');
+  if(rec.meterNotes){mnw.style.display='block';document.getElementById('det-mntxt').textContent=rec.meterNotes;}else mnw.style.display='none';
   document.getElementById('det-del').onclick=async()=>{if(!confirm('Delete?'))return;await del(id);closeDetail();renderRecords();updateTabCount();renderSidebar();toast('Deleted');};
   document.getElementById('det-edit').onclick=()=>{
     // Load record into form for editing
@@ -1000,7 +1018,7 @@ async function pushOne(rec){
     await sReq('POST',`/${settings.sheetId}/values/A:U:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{values:[row]});
     rec.status='synced';rec.driveUrl=du;await save(rec);
     // Mark as done in Route sheet if applicable
-    if(rec.account)try{await markRouteDoneInSheets(rec.account);}catch(e){}
+    if(rec.account)try{await markRouteDoneInSheets(rec);}catch(e){}
     return true;
   }catch(e){toast('Sync failed: '+e.message,'error');return false;}
 }
@@ -1235,9 +1253,11 @@ window.addEventListener('online',updateOnline);
 window.addEventListener('offline',updateOnline);
 /* PWA */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations().then(regs=>{regs.forEach(r=>r.unregister());});
-  caches.keys().then(ks=>ks.forEach(k=>caches.delete(k)));
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js').then(reg=>{
+    // Check for updates every 30 min + on each page load
+    reg.update();
+    setInterval(()=>reg.update(),1800000);
+  }).catch(()=>{});
 }
 /* INIT */
 initDB().then(()=>{loadSettings();updateTabCount();renderSidebar();initGPS();updateOnline();if(settings.clientId)initGoogle();});
@@ -1554,9 +1574,9 @@ async function pushRouteToSheets(buildings){
   if(!token){return new Promise((res,rej)=>{const oldCb=gis.callback;gis.callback=resp=>{if(resp.error){rej(new Error(resp.error));return;}token=resp.access_token;pushRouteToSheets(buildings).then(res).catch(rej);};gis.requestAccessToken();});}
   await ensureRouteSheet();
   // Clear existing route data
-  await sReq('POST',`/${settings.sheetId}/values/Route!A:G:clear`,{});
-  // Build rows
-  const header=['Account','Address','Meter','PrevRead','ContactName','AccessNotes','Status'];
+  await sReq('POST',`/${settings.sheetId}/values/Route!A:J:clear`,{});
+  // Build rows — extra columns for reading data filled after sync
+  const header=['Account','Address','Meter','PrevRead','ContactName','AccessNotes','Status','CurrRead','Consumption','Tech'];
   const rows=buildings.map(b=>[
     b.acct||'',
     b.address||'',
@@ -1564,9 +1584,10 @@ async function pushRouteToSheets(buildings){
     b.prevRead?String(b.prevRead):'',
     b.owner||b.companyName||'',
     b.specialInstruct||'',
-    'route'
+    'route',
+    '','',''
   ]);
-  await sReq('PUT',`/${settings.sheetId}/values/Route!A1:G${rows.length+1}?valueInputOption=RAW`,{values:[header,...rows]});
+  await sReq('PUT',`/${settings.sheetId}/values/Route!A1:J${rows.length+1}?valueInputOption=RAW`,{values:[header,...rows]});
 }
 async function pullRouteFromSheets(){
   if(!settings.clientId||!settings.sheetId){toast('Set up Google Sheets in Settings first','error');return;}
@@ -1574,7 +1595,7 @@ async function pullRouteFromSheets(){
   if(!token){gis.requestAccessToken();return;}
   try{
     await ensureRouteSheet();
-    const data=await sReq('GET',`/${settings.sheetId}/values/Route!A:G`);
+    const data=await sReq('GET',`/${settings.sheetId}/values/Route!A:J`);
     if(!data.values||data.values.length<2){toast('No route data found in Sheets','error');return;}
     const rows=data.values.slice(1); // skip header
     const existing=await getAll();
@@ -1608,13 +1629,14 @@ async function pullRouteFromSheets(){
     }
   }catch(e){toast('Pull failed: '+e.message,'error');}
 }
-async function markRouteDoneInSheets(account){
+async function markRouteDoneInSheets(rec){
   try{
-    const data=await sReq('GET',`/${settings.sheetId}/values/Route!A:G`);
+    const data=await sReq('GET',`/${settings.sheetId}/values/Route!A:J`);
     if(!data.values)return;
     for(let i=1;i<data.values.length;i++){
-      if(data.values[i][0]===account){
-        await sReq('PUT',`/${settings.sheetId}/values/Route!G${i+1}?valueInputOption=RAW`,{values:[['done']]});
+      if(data.values[i][0]===rec.account){
+        // Update Status + CurrRead + Consumption + Tech
+        await sReq('PUT',`/${settings.sheetId}/values/Route!G${i+1}:J${i+1}?valueInputOption=RAW`,{values:[['done',rec.currRead??'',rec.consumption??'',rec.tech||'']]});
         break;
       }
     }

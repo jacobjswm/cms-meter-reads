@@ -1,4 +1,4 @@
-const CACHE='cms-meter-v8';
+const CACHE='cms-meter-v15';
 const ASSETS=[
   './',
   'index.html',

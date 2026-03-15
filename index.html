@@ -281,7 +281,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .rt-status-badge.st-active { background:var(--success-bg); color:var(--success); }
 .rt-status-badge.st-other { background:var(--warning-bg); color:var(--warning); }
 .route-create-bar { position:sticky; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); padding:12px 1.1rem; display:flex; align-items:center; gap:10px; z-index:10; }
-.route-create-bar .btn { flex:1; justify-content:center; padding:12px; font-size:0.88rem; }
+.route-create-bar .btn-accent { flex:1; justify-content:center; padding:12px; font-size:0.88rem; }
+.route-create-bar .btn-danger { flex:0; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -441,6 +442,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             <div class="empty"><div class="ei">📂</div><p>Upload rd_cycle.xlsx and/or rd_req.xlsx to see buildings.</p></div>
           </div>
           <div class="route-create-bar" id="route-create-bar" style="display:none">
+            <button class="btn btn-danger btn-sm" onclick="clearRoute()">Clear Route</button>
             <button class="btn btn-accent" onclick="createRoute()">Create Route</button>
           </div>
         </div>
@@ -1354,6 +1356,15 @@ function updateRouteSelCount(){
     if(stF&&b.status!==stF)return false;
     return true;
   }).length;
+}
+async function clearRoute(){
+  const all=await getAll();
+  const routes=all.filter(r=>r.status==='route');
+  if(!routes.length){toast('No route entries to clear','error');return;}
+  if(!confirm('Clear '+routes.length+' route entries from sidebar?'))return;
+  for(const r of routes) await del(r.id);
+  toast(routes.length+' route entries cleared','success');
+  updateTabCount();renderSidebar();
 }
 async function createRoute(){
   if(!routeSelected.size){toast('Select buildings first','error');return;}

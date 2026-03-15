@@ -451,6 +451,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             <button class="btn btn-danger btn-sm" onclick="clearRoute()">Clear Route</button>
             <button class="btn btn-accent" onclick="createRoute()">Create Route</button>
           </div>
+          <div style="margin-top:12px;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
+            <div style="font-size:0.72rem;font-weight:600;color:var(--text-dim);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Or Pull from Google Sheets</div>
+            <button class="btn btn-accent" onclick="pullRouteFromSheets()" style="width:100%">📥 Pull Route from Sheets</button>
+          </div>
         </div>
         <!-- SETTINGS PANE -->
         <div class="pane" id="pane-settings">
@@ -994,7 +998,10 @@ async function pushOne(rec){
     const chk=await sReq('GET',`/${settings.sheetId}/values/A1`);
     if(!chk.values?.length)await sReq('PUT',`/${settings.sheetId}/values/A1:U1?valueInputOption=RAW`,{values:[['Date','Time','Account','Address','Unit','Meter','Type','Prev','Curr','Consumption','Tech','Notes','Photo','Contact','Phone','Email','Access','GPS Lat','GPS Lng','Flagged','ID']]});
     await sReq('POST',`/${settings.sheetId}/values/A:U:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{values:[row]});
-    rec.status='synced';rec.driveUrl=du;await save(rec);return true;
+    rec.status='synced';rec.driveUrl=du;await save(rec);
+    // Mark as done in Route sheet if applicable
+    if(rec.account)try{await markRouteDoneInSheets(rec.account);}catch(e){}
+    return true;
   }catch(e){toast('Sync failed: '+e.message,'error');return false;}
 }
 function sReq(m,p,b){return fetch('https://sheets.googleapis.com/v4/spreadsheets'+p,{method:m,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}).then(r=>r.json());}
@@ -1521,9 +1528,93 @@ async function createRoute(){
   addrs.forEach(a=>openAddrs.add(a));
   toast(created+' building'+(created!==1?'s':'')+' added to route!','success');
   updateTabCount();await renderSidebar();
+  // Push route to Google Sheets if configured
+  if(settings.clientId&&settings.sheetId){
+    try{await pushRouteToSheets(selected);toast('Route synced to Sheets!','success');}
+    catch(e){toast('Route saved locally but Sheets sync failed: '+e.message,'error');}
+  }
   // Open sidebar on desktop
   if(window.innerWidth>700){sbOpen=true;document.getElementById('sidebar').classList.remove('collapsed');}
   switchTab('new-read');
+}
+/* ROUTE SHEETS SYNC */
+async function ensureRouteSheet(){
+  const info=await sReq('GET',`/${settings.sheetId}?fields=sheets.properties.title`);
+  const exists=info.sheets&&info.sheets.some(s=>s.properties.title==='Route');
+  if(!exists){
+    await sReq('POST',`/${settings.sheetId}:batchUpdate`,{requests:[{addSheet:{properties:{title:'Route'}}}]});
+  }
+}
+async function pushRouteToSheets(buildings){
+  if(!gis){initGoogle();}
+  if(!token){return new Promise((res,rej)=>{const oldCb=gis.callback;gis.callback=resp=>{if(resp.error){rej(new Error(resp.error));return;}token=resp.access_token;pushRouteToSheets(buildings).then(res).catch(rej);};gis.requestAccessToken();});}
+  await ensureRouteSheet();
+  // Clear existing route data
+  await sReq('POST',`/${settings.sheetId}/values/Route!A:G:clear`,{});
+  // Build rows
+  const header=['Account','Address','Meter','PrevRead','ContactName','AccessNotes','Status'];
+  const rows=buildings.map(b=>[
+    b.acct||'',
+    b.address||'',
+    b.meterNum||'',
+    b.prevRead?String(b.prevRead):'',
+    b.owner||b.companyName||'',
+    b.specialInstruct||'',
+    'route'
+  ]);
+  await sReq('PUT',`/${settings.sheetId}/values/Route!A1:G${rows.length+1}?valueInputOption=RAW`,{values:[header,...rows]});
+}
+async function pullRouteFromSheets(){
+  if(!settings.clientId||!settings.sheetId){toast('Set up Google Sheets in Settings first','error');return;}
+  if(!gis){initGoogle();toast('Initializing Google — try again','error');return;}
+  if(!token){gis.requestAccessToken();return;}
+  try{
+    await ensureRouteSheet();
+    const data=await sReq('GET',`/${settings.sheetId}/values/Route!A:G`);
+    if(!data.values||data.values.length<2){toast('No route data found in Sheets','error');return;}
+    const rows=data.values.slice(1); // skip header
+    const existing=await getAll();
+    const routeAccts=new Set(existing.filter(r=>r.status==='route').map(r=>r.account));
+    let added=0;
+    for(const row of rows){
+      const [account,address,meter,prevReadStr,contactName,accessNotes,status]=row;
+      if(status&&status.toLowerCase()==='done')continue; // already completed
+      if(routeAccts.has(account))continue; // already in local route
+      const rec={
+        id:Date.now()+'-'+Math.random().toString(36).slice(2,7)+'-'+added,
+        ts:Date.now(),account:account||'',address:address||'',
+        meter:meter||'',unit:'',type:'water',
+        prevRead:prevReadStr?parseFloat(String(prevReadStr).replace(/,/g,'')):null,
+        currRead:0,consumption:null,notes:'',meterNotes:'',photo:null,
+        tech:settings.tech||'',status:'route',driveUrl:null,
+        contactName:contactName||'',contactPhone:'',contactEmail:'',
+        accessNotes:accessNotes||'',
+        gpsLat:null,gpsLng:null,flagged:false,
+      };
+      await save(rec);
+      openAddrs.add(address||'(No address)');
+      added++;
+    }
+    if(added){
+      toast(added+' route entr'+(added!==1?'ies':'y')+' pulled from Sheets!','success');
+      await updateTabCount();await renderSidebar();
+      if(window.innerWidth>700){sbOpen=true;document.getElementById('sidebar').classList.remove('collapsed');}
+    }else{
+      toast('No new route entries to pull','error');
+    }
+  }catch(e){toast('Pull failed: '+e.message,'error');}
+}
+async function markRouteDoneInSheets(account){
+  try{
+    const data=await sReq('GET',`/${settings.sheetId}/values/Route!A:G`);
+    if(!data.values)return;
+    for(let i=1;i<data.values.length;i++){
+      if(data.values[i][0]===account){
+        await sReq('PUT',`/${settings.sheetId}/values/Route!G${i+1}?valueInputOption=RAW`,{values:[['done']]});
+        break;
+      }
+    }
+  }catch(e){/* silent — reading sync is more important */}
 }
 </script>
 </body>
